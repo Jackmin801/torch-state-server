@@ -13,3 +13,6 @@ _utils = load(
 
 def copy_bytes_to_tensor(tensor: torch.Tensor, bytes_data: bytes) -> None:
     _utils.copy_bytes_to_tensor(tensor, bytes_data)
+
+def get_bytes_from_tensor(tensor: torch.Tensor) -> bytes:
+    return _utils.get_bytes_from_tensor(tensor)
