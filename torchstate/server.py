@@ -2,6 +2,7 @@ import struct
 import socket
 import threading
 from torchstate.C.utils import get_bytes_from_tensor
+from torchstate.logging import get_logger
 
 class StateServer:
     def __init__(self, state_dict: dict, host: str = "0.0.0.0", port: int = 12345):
@@ -11,6 +12,7 @@ class StateServer:
         self._listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._running = False
         self._server_thread = None
+        self._logger = get_logger("StateServer")
 
     def start(self):
         """Start the server in a separate thread."""
@@ -21,23 +23,20 @@ class StateServer:
         self._server_thread = threading.Thread(target=self._server_loop)
         self._server_thread.daemon = True  # Thread will exit when main program exits
         self._server_thread.start()
-        print(f"Server started on {self.host}:{self.port}")
+        self._logger.info(f"Server started on {self.host}:{self.port}")
 
     def _handle_client(self, client_socket: socket.socket, client_address: tuple):
         """Handle individual client connections."""
         try:
-            print(f"Connected by {client_address}")
             data = client_socket.recv(252 + 4 + 4)
-            print(len(data))
             if data:
                 path, dtype, size = struct.unpack('252sii', data)
                 path = path.decode().strip('\x00')  # Decode and strip padding
-                print(f"Received path: {path}, dtype: {dtype}, size: {size}")
+                self._logger.info("%s:%d %s %d %d", client_address[0], client_address[1], path, dtype, size)
                 data = get_bytes_from_tensor(self.state_dict['tensor'])
-                print(f"Sending data {len(data)}: {data}")
                 client_socket.sendall(data)
         except Exception as e:
-            print(f"Error handling client {client_address}: {e}")
+            self._logger.error(f"Error handling client {client_address}: {e}")
         finally:
             client_socket.close()
 
@@ -58,7 +57,7 @@ class StateServer:
                 client_thread.start()
             except Exception as e:
                 if self._running:  # Only print error if we're still meant to be running
-                    print(f"Error accepting connection: {e}")
+                    self._logger.error(f"Error accepting connection: {e}")
 
     def stop(self):
         """Stop the server gracefully."""
@@ -77,14 +76,14 @@ class StateServer:
         self._server_thread.join()
         self._server_thread = None
         self.close()
-        print("Server stopped")
+        self._logger.info("Server stopped")
 
     def close(self):
         """Close the listening socket."""
         try:
             self._listen_socket.close()
         except Exception as e:
-            print(f"Error closing socket: {e}")
+            self._logger.error(f"Error closing socket: {e}")
 
     def __del__(self):
         try:
