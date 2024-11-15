@@ -176,6 +176,7 @@ class StateServer:
 
     def _server_loop(self):
         """Main server loop running in separate thread."""
+        self._listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._listen_socket.bind((self.host, self.port))
         self._listen_socket.listen()
         
@@ -214,7 +215,9 @@ class StateServer:
     def close(self):
         """Close the listening socket."""
         try:
+            print("Hello, im closing")
             self._listen_socket.close()
+            print("Done with close?")
         except Exception as e:
             self._logger.error(f"Error closing socket: {e}")
 
