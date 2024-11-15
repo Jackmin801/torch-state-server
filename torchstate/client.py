@@ -58,7 +58,7 @@ class StateClient:
         self.client_socket.connect((self.hostname, self.port))
 
     def _handle_error_response(self, succ: int, ttype: int, size: int):
-        """Handle error responses from the server"""
+        """Handle error responses from the server. Raises an exception if not successful"""
         if succ != 0:
             if ttype == ScalarTransferType.STR.value:
                 response = self.client_socket.recv(size)
@@ -66,42 +66,6 @@ class StateClient:
                 raise StateClientError(response.decode())
             self.client_socket.close()
             raise StateClientError("Failed to get value")
-
-    def _get_scalar(self, path: str, scalar_type: ScalarTransferType, expected_type: Type[T]) -> T:
-        """Generic method to handle scalar data retrieval"""
-        size, fmt, _ = SCALAR_TYPE_MAPPING[scalar_type]
-        
-        # Special handling for strings
-        if scalar_type == ScalarTransferType.STR:
-            packed_request = _pack_request(path, scalar_type.value, -1)
-        else:
-            packed_request = _pack_request(path, scalar_type.value, size)
-
-        # Reset socket connection
-        self._init_socket()
-        
-        try:
-            # Send request
-            self.client_socket.sendall(packed_request)
-
-            # Receive and parse header
-            resp_header = self.client_socket.recv(16)
-            succ, ttype, recv_size = struct.unpack('iiq', resp_header)
-            
-            # Check for errors
-            self._handle_error_response(succ, ttype, recv_size)
-
-            # Handle string separately
-            if scalar_type == ScalarTransferType.STR:
-                data = self.client_socket.recv(recv_size)
-                return data.decode()
-
-            # Handle other scalar types
-            data = self.client_socket.recv(size)
-            return struct.unpack(fmt, data)[0]
-
-        finally:
-            self.client_socket.close()
 
     def get_tensor(
         self,
@@ -149,6 +113,42 @@ class StateClient:
             copy_bytes_to_tensor(inplace_tensor, tensor_data)
 
             return inplace_tensor
+
+        finally:
+            self.client_socket.close()
+
+    def _get_scalar(self, path: str, scalar_type: ScalarTransferType, expected_type: Type[T]) -> T:
+        """Generic method to handle scalar data retrieval"""
+        size, fmt, _ = SCALAR_TYPE_MAPPING[scalar_type]
+        
+        # Special handling for strings
+        if scalar_type == ScalarTransferType.STR:
+            packed_request = _pack_request(path, scalar_type.value, -1)
+        else:
+            packed_request = _pack_request(path, scalar_type.value, size)
+
+        # Reset socket connection
+        self._init_socket()
+        
+        try:
+            # Send request
+            self.client_socket.sendall(packed_request)
+
+            # Receive and parse header
+            resp_header = self.client_socket.recv(16)
+            succ, ttype, recv_size = struct.unpack('iiq', resp_header)
+            
+            # Check for errors
+            self._handle_error_response(succ, ttype, recv_size)
+
+            # Handle string separately
+            if scalar_type == ScalarTransferType.STR:
+                data = self.client_socket.recv(recv_size)
+                return data.decode()
+
+            # Handle other scalar types
+            data = self.client_socket.recv(size)
+            return struct.unpack(fmt, data)[0]
 
         finally:
             self.client_socket.close()
