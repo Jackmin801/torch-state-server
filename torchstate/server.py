@@ -1,8 +1,30 @@
+import torch
+from typing import Any, Dict
 import struct
 import socket
 import threading
 from torchstate.C.utils import get_bytes_from_tensor
 from torchstate.logging import get_logger
+
+class StateServerError(Exception):
+    pass
+
+def get_nested_value(d: Dict, path: str) -> Any:
+    """Extract nested value from dictionary using path notation.
+    
+    Raises:
+        StateServerError: If the path is not found in the dictionary.
+    """
+    try:
+        parts = path.strip('[]').split('][')
+        current = d
+        for part in parts:
+            if part.isdigit():
+                part = int(part)
+            current = current[part]
+        return current
+    except (KeyError, TypeError):
+        raise StateServerError(f"Path {path} not found in state dictionary")
 
 class StateServer:
     def __init__(self, state_dict: dict, host: str = "0.0.0.0", port: int = 12345):
@@ -33,7 +55,20 @@ class StateServer:
                 path, dtype, size = struct.unpack('252sii', data)
                 path = path.decode().strip('\x00')  # Decode and strip padding
                 self._logger.info("%s:%d %s %d %d", client_address[0], client_address[1], path, dtype, size)
-                data = get_bytes_from_tensor(self.state_dict['tensor'])
+
+                value = get_nested_value(self.state_dict, path)
+                if dtype == 0:
+                    if isinstance(value, float):
+                        data = struct.pack('d', value)
+                    elif isinstance(value, int):
+                        data = struct.pack('q', value)
+                    elif isinstance(value, str):
+                        data = struct.pack('256s', value)
+                    else:
+                        raise ValueError("Value is not float, int or str")
+                else:
+                    assert isinstance(value, torch.Tensor)
+                    data = get_bytes_from_tensor(value)
                 client_socket.sendall(data)
         except Exception as e:
             self._logger.error(f"Error handling client {client_address}: {e}")
