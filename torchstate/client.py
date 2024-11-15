@@ -17,6 +17,23 @@ SCALAR_TYPE_MAPPING = {
     ScalarTransferType.STR: (None, None, str),  # Special case handled separately
 }
 
+CHUNK_SIZE = 2 * 4096
+
+def recv_exact(sock: socket.socket, size: int, chunk_size: int = CHUNK_SIZE) -> bytes:
+    """Receive exactly size bytes from socket, handling large transfers in chunks."""
+    data = bytearray()
+    remaining = size
+    
+    while remaining > 0:
+        chunk = min(remaining, chunk_size)
+        received = sock.recv(chunk)
+        if not received:
+            raise ConnectionError("Connection closed before receiving all data")
+        data.extend(received)
+        remaining -= len(received)
+    
+    return bytes(data)
+
 def _pack_request(path: str, transfer_type: int, size: int) -> bytes:
     if len(path) > 244:
         raise ValueError("Path length must be at most 244 characters")
@@ -86,7 +103,7 @@ class StateClient:
 
             # Receive the tensor data
             elem_size = TTYPE_TO_ELEMENT_SIZE[ttype]
-            tensor_data = self.client_socket.recv(elem_size * size)
+            tensor_data = recv_exact(self.client_socket, elem_size * size)
             copy_bytes_to_tensor(inplace_tensor, tensor_data)
 
             return inplace_tensor
