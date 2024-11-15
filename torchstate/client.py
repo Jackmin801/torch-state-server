@@ -69,7 +69,7 @@ class StateClient:
     ) -> torch.Tensor:
         # Pack the request
         encoded_transfer_type = transfer_type.value if transfer_type else -1
-        encoded_size = inplace_tensor.numel() if inplace_tensor else -1
+        encoded_size = inplace_tensor.numel() if inplace_tensor is None else -1
         packed_request = _pack_request(path, encoded_transfer_type, encoded_size)
 
         # Reset socket connection
