@@ -215,9 +215,7 @@ class StateServer:
     def close(self):
         """Close the listening socket."""
         try:
-            print("Hello, im closing")
             self._listen_socket.close()
-            print("Done with close?")
         except Exception as e:
             self._logger.error(f"Error closing socket: {e}")
 
