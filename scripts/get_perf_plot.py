@@ -17,13 +17,14 @@ def bench(N: int) -> float:
 
     time_takens = []
 
+    a = torch.empty(N)
     for _ in range(10):
         start_time = time.perf_counter()
-        a = client.get_tensor("tensor")
+        client.get_tensor("tensor", inplace_tensor=a)
         time_takens.append(time.perf_counter() - start_time)
 
     mbps = a.element_size() * a.numel() / (1024**2) / (sum(time_takens) / len(time_takens))
-    print(f"MB/s: {mbps}")
+    print(f"MB/s: {mbps}, {sum(time_takens) / len(time_takens)}")
     # CLIENT END
 
     time.sleep(1)
@@ -43,7 +44,7 @@ if __name__ == "__main__":
     from matplotlib import pyplot as plt
     plt.plot(aa, bb)
     plt.xscale('log')
-    plt.savefig('meow.png')
+    plt.savefig('woof.png')
     plt.title("Bandwidth utilization vs tensor size")
     plt.xlabel("Tensor size")
     plt.ylabel("MB/s")
